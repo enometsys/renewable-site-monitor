@@ -50,3 +50,22 @@ export function fetchReadings(params: {
   })
   return getJSON<ReadingsResponse>(`/api/readings?${q}`)
 }
+
+export interface AskResponse {
+  answer: string
+  sql: string | null
+  rows: Record<string, unknown>[]
+}
+
+export async function ask(question: string): Promise<AskResponse> {
+  const res = await fetch("/api/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error(detail.detail ?? `Request failed (${res.status})`)
+  }
+  return res.json()
+}

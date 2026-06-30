@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { AskPanel } from "@/components/AskPanel"
 import { TimeSeriesChart } from "@/components/TimeSeriesChart"
 import {
   fetchReadings,
@@ -174,6 +175,8 @@ export default function App() {
           </Card>
         </>
       )}
+
+      <AskPanel />
     </div>
   )
 }
