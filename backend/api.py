@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import os
+
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 import config
-from src import anomaly, db
+from src import agent, anomaly, db
 
 app = FastAPI(title="Renewable Site Monitor API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -71,3 +74,23 @@ def get_readings(
         },
         "series": series,
     }
+
+
+class AskRequest(BaseModel):
+    question: str
+
+
+@app.post("/api/ask")
+def ask(req: AskRequest):
+    if not (os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_BASE_URL")):
+        raise HTTPException(
+            503,
+            "No LLM configured. Set OPENAI_API_KEY (cloud) or OPENAI_BASE_URL "
+            "(e.g. http://localhost:11434/v1 for Ollama).",
+        )
+    if not req.question.strip():
+        raise HTTPException(422, "question is required")
+    try:
+        return agent.ask(req.question)
+    except ValueError as e:
+        raise HTTPException(400, str(e))

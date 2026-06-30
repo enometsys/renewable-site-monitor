@@ -64,12 +64,41 @@ backend/
   src/db.py    SQLite schema + queries
   src/etl.py   fetch -> clean -> load
   src/anomaly.py
+  src/agent.py grounded NL->SQL agent (Part 2)
 frontend/
   src/App.tsx, src/lib/api.ts, src/components/
 ```
 
 Sites: Burgos Wind Farm (Ilocos Norte), Cadiz Solar (Negros Occidental), Nabas Wind
 Farm (Aklan) — real PH renewable sites, spread across the grid.
+
+## Part 2 (bonus): ask the data in plain English
+
+`POST /api/ask {question}` runs a grounded NL-to-SQL agent and the dashboard's "Ask the
+data" panel uses it. Flow: the model writes one **read-only** `SELECT`, SQLite runs it,
+and the model answers **only from the returned rows** — it never sees the data until
+after the query runs, so it can't invent numbers. Out-of-scope questions ("weather in
+Tokyo") return "I don't have data for that" instead of a guess.
+
+Grounding/safety: the generated SQL is validated (single `SELECT`/`WITH` only;
+`INSERT/UPDATE/DELETE/DROP/PRAGMA/…` and multi-statement rejected; a `LIMIT` is forced)
+and executed on a read-only SQLite connection. A failed query gets one repair attempt,
+then degrades to a graceful message.
+
+It speaks the **OpenAI API**, so it runs against OpenAI cloud or a local model:
+
+```bash
+# OpenAI cloud
+export OPENAI_API_KEY=sk-...           # OPENAI_MODEL defaults to gpt-4o-mini
+
+# or local, via Ollama (OpenAI-compatible endpoint)
+ollama pull qwen3:4b
+export OPENAI_BASE_URL=http://localhost:11434/v1 OPENAI_API_KEY=ollama OPENAI_MODEL=qwen3:4b
+```
+
+Without either set, `/api/ask` returns 503 and the rest of the dashboard works normally.
+Answer quality scales with the model — tested locally with Ollama `qwen3:4b`; larger
+models (e.g. `gpt-4o-mini`) produce more reliable SQL on edge cases.
 
 ## Not done / next
 
@@ -78,7 +107,4 @@ Farm (Aklan) — real PH renewable sites, spread across the grid.
 - Anomaly detection is univariate; contextual cases (low solar on a clear day) need a
   clear-sky baseline.
 - ETL is a manual run; a cron would keep the window rolling.
-
-**Part 2 (bonus):** a grounded NL-to-SQL agent — translate the question to a
-parameterised SELECT over `readings`/`sites`, run it, answer only from the rows. Would
-mount as `/api/ask` and reuse `db.py`. Skipped for time.
+- The agent is single-turn; conversational follow-ups would need history threading.
